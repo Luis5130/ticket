@@ -19,13 +19,30 @@ if uploaded_file is None:
 
 df = load_data(uploaded_file)
 
-# Renomeando colunas para consistência
+# -----------------------
+# Padronização das colunas
+# -----------------------
 df = df.rename(columns={
     "cod_prestador": "Herói",
     "Preço de Hospedagem": "Preco",
 })
 
-# Conversão por Herói
+# -----------------------
+# Conversão da coluna Preço para número
+# -----------------------
+df["Preco"] = (
+    df["Preco"]
+    .astype(str)
+    .str.replace("R$", "", regex=False)
+    .str.replace(".", "", regex=False)
+    .str.replace(",", ".", regex=False)
+)
+
+df["Preco"] = pd.to_numeric(df["Preco"], errors="coerce")
+
+# -----------------------
+# Cálculo de Conversão
+# -----------------------
 df["Conversao"] = df["Convertidas"] / df["Necessidades"]
 df["Conversao"] = df["Conversao"].fillna(0)
 
@@ -94,13 +111,13 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.metric("Total de Heróis", df_bairro["Herói"].nunique())
-    st.metric("Média de Preço", round(df_bairro["Preco"].mean(), 2))
+    st.metric("Média de Preço (R$)", round(df_bairro["Preco"].mean(), 2))
 
 with col2:
     st.metric("Total Necessidades", df_bairro["Necessidades"].sum())
     st.metric("Total Convertidas", df_bairro["Convertidas"].sum())
 
-# Melhor, menor e maior preço
+# Herói destaque / mais barato / mais caro
 melhor = df_bairro.sort_values("Conversao", ascending=False).iloc[0]
 mais_barato = df_bairro.sort_values("Preco", ascending=True).iloc[0]
 mais_caro = df_bairro.sort_values("Preco", ascending=False).iloc[0]
@@ -127,7 +144,7 @@ st.write("### 📄 Todos os Heróis do Bairro")
 st.dataframe(df_bairro, use_container_width=True)
 
 # -----------------------
-# ABA GERAL STATUS DE PREÇO
+# TABELA GERAL STATUS DE PREÇO
 # -----------------------
 st.write("## 🧭 Status de Preço - Geral")
 st.dataframe(df[["Bairro", "Herói", "Preco", "Status_Preco", "Conversao"]], use_container_width=True)
