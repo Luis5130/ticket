@@ -1,150 +1,74 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Melhor Herói por Bairro", layout="wide")
+st.set_page_config(page_title="Dash Melhor Herói", layout="wide")
 
-# -----------------------
-# Upload do arquivo
-# -----------------------
 @st.cache_data
 def load_data(uploaded_file):
-    return pd.read_excel(uploaded_file, engine="openpyxl")
+    df = pd.read_excel(uploaded_file)
+    df.rename(columns={
+        "Preço de Hospedagem": "Preco",
+        "Necessidades": "Necessidades",
+        "Convertidas": "Convertidas"
+    }, inplace=True)
 
-st.sidebar.title("⚙️ Configurações")
-uploaded_file = st.sidebar.file_uploader("Envie a planilha (.xlsx):", type=["xlsx"])
+    # Garantir número
+    df["Preco"] = pd.to_numeric(df["Preco"], errors="coerce")
+    df["Necessidades"] = pd.to_numeric(df["Necessidades"], errors="coerce")
+    df["Convertidas"] = pd.to_numeric(df["Convertidas"], errors="coerce")
 
-if uploaded_file is None:
-    st.warning("Envie uma planilha para iniciar.")
-    st.stop()
+    # Conversão
+    df["Conversao"] = df["Convertidas"] / df["Necessidades"]
+    df["Conversao"].fillna(0, inplace=True)
 
-df = load_data(uploaded_file)
+    return df
 
-# -----------------------
-# Padronização das colunas
-# -----------------------
-df = df.rename(columns={
-    "cod_prestador": "Herói",
-    "Preço de Hospedagem": "Preco",
-})
-
-# -----------------------
-# Conversão da coluna Preço para número
-# -----------------------
-df["Preco"] = (
-    df["Preco"]
-    .astype(str)
-    .str.replace("R$", "", regex=False)
-    .str.replace(".", "", regex=False)
-    .str.replace(",", ".", regex=False)
-)
-
-df["Preco"] = pd.to_numeric(df["Preco"], errors="coerce")
-
-# -----------------------
-# Cálculo de Conversão
-# -----------------------
-df["Conversao"] = df["Convertidas"] / df["Necessidades"]
-df["Conversao"] = df["Conversao"].fillna(0)
-
-# -----------------------
-# STATUS DE PREÇO POR BAIRRO
-# -----------------------
 def calcular_status(df):
-    status_list = []
+    resultados = []
 
     for bairro, group in df.groupby("Bairro"):
         media_preco = group["Preco"].mean()
-        min_preco = group["Preco"].min()
         max_preco = group["Preco"].max()
+        min_preco = group["Preco"].min()
 
-        threshold_low = media_preco * 0.9
-        threshold_high = media_preco * 1.1
+        # Melhor herói = quem tem mais convertidas, empatou → maior conversão
+        melhor = group.sort_values(["Convertidas", "Conversao"], ascending=[False, False]).iloc[0]
 
-        for _, row in group.iterrows():
-            preco = row["Preco"]
+        # Status de Preço desse melhor
+        if melhor["Preco"] == max_preco:
+            status = "Mais Caro do Bairro"
+        elif melhor["Preco"] == min_preco:
+            status = "Mais Barato do Bairro"
+        elif melhor["Preco"] > media_preco * 1.10:
+            status = "Acima da Média"
+        elif melhor["Preco"] < media_preco * 0.90:
+            status = "Abaixo da Média"
+        else:
+            status = "Na Média"
 
-            if preco == min_preco:
-                status = "Mais Barato da Região"
-            elif preco == max_preco:
-                status = "Mais Caro da Região"
-            elif preco < threshold_low:
-                status = "Abaixo da Média"
-            elif preco > threshold_high:
-                status = "Acima da Média"
-            else:
-                status = "Na Média"
+        resultados.append({
+            "Bairro": bairro,
+            "Herói": melhor["Herói"] if "Herói" in melhor else melhor["cod_prestador"],
+            "Cidade": melhor["Cidade"] if "Cidade" in melhor else "",
+            "Necessidades": melhor["Necessidades"],
+            "Convertidas": melhor["Convertidas"],
+            "Conversão (%)": round(melhor["Conversao"] * 100, 1),
+            "Preço": melhor["Preco"],
+            "Status de Preço": status
+        })
 
-            status_list.append(status)
+    return pd.DataFrame(resultados)
 
-    df["Status_Preco"] = status_list
-    return df
+uploaded_file = st.file_uploader("📂 Envie a planilha", type=["xlsx"])
 
-df = calcular_status(df)
+if uploaded_file:
+    df = load_data(uploaded_file)
+    resultado = calcular_status(df)
 
-# -----------------------
-# VISÃO GERAL
-# -----------------------
-st.title("📍 Visão Geral dos Heróis por Bairro")
+    st.markdown("## ⭐ Heróis com Melhor Conversão (por Bairro)")
+    st.dataframe(resultado, use_container_width=True)
 
-agregado = df.groupby("Bairro").agg(
-    Total_Herois=("Herói", "nunique"),
-    Total_Necessidades=("Necessidades", "sum"),
-    Total_Convertidas=("Convertidas", "sum")
-).reset_index()
-
-agregado["Conversao_Bairro"] = (
-    agregado["Total_Convertidas"] / agregado["Total_Necessidades"]
-).fillna(0)
-
-st.dataframe(agregado, use_container_width=True)
-
-# -----------------------
-# FILTRO DE BAIRRO
-# -----------------------
-bairro = st.selectbox("Selecione um Bairro:", sorted(df["Bairro"].unique()))
-
-df_bairro = df[df["Bairro"] == bairro]
-
-st.subheader(f"📊 Análise detalhada - {bairro}")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.metric("Total de Heróis", df_bairro["Herói"].nunique())
-    st.metric("Média de Preço (R$)", round(df_bairro["Preco"].mean(), 2))
-
-with col2:
-    st.metric("Total Necessidades", df_bairro["Necessidades"].sum())
-    st.metric("Total Convertidas", df_bairro["Convertidas"].sum())
-
-# Herói destaque / mais barato / mais caro
-melhor = df_bairro.sort_values("Conversao", ascending=False).iloc[0]
-mais_barato = df_bairro.sort_values("Preco", ascending=True).iloc[0]
-mais_caro = df_bairro.sort_values("Preco", ascending=False).iloc[0]
-
-st.write("### ⭐ Melhor Conversão no Bairro")
-st.dataframe(melhor.to_frame().T)
-
-st.write("### 💸 Menor Preço no Bairro")
-st.dataframe(mais_barato.to_frame().T)
-
-st.write("### 🏆 Maior Preço no Bairro")
-st.dataframe(mais_caro.to_frame().T)
-
-# -----------------------
-# GRÁFICO DE PREÇOS
-# -----------------------
-st.write("### 📉 Distribuição de Preços por Herói")
-st.bar_chart(df_bairro.set_index("Herói")["Preco"])
-
-# -----------------------
-# TABELA COMPLETA DO BAIRRO
-# -----------------------
-st.write("### 📄 Todos os Heróis do Bairro")
-st.dataframe(df_bairro, use_container_width=True)
-
-# -----------------------
-# TABELA GERAL STATUS DE PREÇO
-# -----------------------
-st.write("## 🧭 Status de Preço - Geral")
-st.dataframe(df[["Bairro", "Herói", "Preco", "Status_Preco", "Conversao"]], use_container_width=True)
+    # Gráfico Status
+    st.markdown("### 📊 Status de Preço entre os Melhores Convertidos")
+    graf = resultado.groupby("Status de Preço").size().reset_index(name="Qtd")
+    st.bar_chart(graf, x="Status de Preço", y="Qtd")
