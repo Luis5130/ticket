@@ -8,7 +8,7 @@ st.set_page_config(page_title="Melhor Herói por Bairro", layout="wide")
 # -----------------------
 @st.cache_data
 def load_data(uploaded_file):
-    return pd.read_excel(uploaded_file)
+    return pd.read_excel(uploaded_file, engine="openpyxl")
 
 st.sidebar.title("⚙️ Configurações")
 uploaded_file = st.sidebar.file_uploader("Envie a planilha (.xlsx):", type=["xlsx"])
@@ -30,21 +30,21 @@ df["Conversao"] = df["Convertidas"] / df["Necessidades"]
 df["Conversao"] = df["Conversao"].fillna(0)
 
 # -----------------------
-# Cálculo do Status de Preço por Bairro
+# STATUS DE PREÇO POR BAIRRO
 # -----------------------
 def calcular_status(df):
     status_list = []
-    for bairro, group in df.groupby("Bairro"):
 
+    for bairro, group in df.groupby("Bairro"):
         media_preco = group["Preco"].mean()
         min_preco = group["Preco"].min()
         max_preco = group["Preco"].max()
 
-        for _, row in group.iterrows():
+        threshold_low = media_preco * 0.9
+        threshold_high = media_preco * 1.1
 
+        for _, row in group.iterrows():
             preco = row["Preco"]
-            threshold_low = media_preco * 0.9
-            threshold_high = media_preco * 1.1
 
             if preco == min_preco:
                 status = "Mais Barato da Região"
@@ -75,9 +75,11 @@ agregado = df.groupby("Bairro").agg(
     Total_Convertidas=("Convertidas", "sum")
 ).reset_index()
 
-agregado["Conversao_Bairro"] = agregado["Total_Convertidas"] / agregado["Total_Necessidades"]
+agregado["Conversao_Bairro"] = (
+    agregado["Total_Convertidas"] / agregado["Total_Necessidades"]
+).fillna(0)
 
-st.dataframe(agregado)
+st.dataframe(agregado, use_container_width=True)
 
 # -----------------------
 # FILTRO DE BAIRRO
@@ -98,34 +100,34 @@ with col2:
     st.metric("Total Necessidades", df_bairro["Necessidades"].sum())
     st.metric("Total Convertidas", df_bairro["Convertidas"].sum())
 
-# Herói com melhor conversão
+# Melhor, menor e maior preço
 melhor = df_bairro.sort_values("Conversao", ascending=False).iloc[0]
-pior = df_bairro.sort_values("Preco").iloc[0]
-caro = df_bairro.sort_values("Preco").iloc[-1]
+mais_barato = df_bairro.sort_values("Preco", ascending=True).iloc[0]
+mais_caro = df_bairro.sort_values("Preco", ascending=False).iloc[0]
 
 st.write("### ⭐ Melhor Conversão no Bairro")
-st.write(melhor)
+st.dataframe(melhor.to_frame().T)
 
 st.write("### 💸 Menor Preço no Bairro")
-st.write(pior)
+st.dataframe(mais_barato.to_frame().T)
 
 st.write("### 🏆 Maior Preço no Bairro")
-st.write(caro)
+st.dataframe(mais_caro.to_frame().T)
 
 # -----------------------
-# GRÁFICO
+# GRÁFICO DE PREÇOS
 # -----------------------
-st.write("### 📉 Distribuição de Preços")
+st.write("### 📉 Distribuição de Preços por Herói")
 st.bar_chart(df_bairro.set_index("Herói")["Preco"])
 
 # -----------------------
 # TABELA COMPLETA DO BAIRRO
 # -----------------------
-st.write("### 📄 Todos Heróis do Bairro")
-st.dataframe(df_bairro)
+st.write("### 📄 Todos os Heróis do Bairro")
+st.dataframe(df_bairro, use_container_width=True)
 
 # -----------------------
-# Aba Geral — Status de Preço
+# ABA GERAL STATUS DE PREÇO
 # -----------------------
 st.write("## 🧭 Status de Preço - Geral")
-st.dataframe(df[["Bairro", "Herói", "Preco", "Status_Preco", "Conversao"]])
+st.dataframe(df[["Bairro", "Herói", "Preco", "Status_Preco", "Conversao"]], use_container_width=True)
