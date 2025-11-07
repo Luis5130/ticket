@@ -31,4 +31,51 @@ for c in cols_numericas:
         df[c]
         .astype(str)
         .str.replace("R$", "", regex=False)
-        .s
+        .str.replace(".", "", regex=False)  # remove milhar
+        .str.replace(",", ".", regex=False) # troca vírgula por ponto
+        .astype(float)
+    )
+
+# conversão em percentual
+df["conversao"] = (
+    df["convertidas"] / df["necessidades"]
+).fillna(0)
+
+# --- FILTROS ---
+st.sidebar.header("Filtros")
+
+f_uf = st.sidebar.selectbox("UF", ["Todas"] + sorted(df.uf.dropna().unique().tolist()))
+if f_uf != "Todas":
+    df = df[df.uf == f_uf]
+
+f_cidade = st.sidebar.selectbox("Cidade", ["Todas"] + sorted(df.cidade.dropna().unique().tolist()))
+if f_cidade != "Todas":
+    df = df[df.cidade == f_cidade]
+
+f_bairro = st.sidebar.selectbox("Bairro", ["Todas"] + sorted(df.bairro.dropna().unique().tolist()))
+if f_bairro != "Todas":
+    df = df[df.bairro == f_bairro]
+
+# --- KPIs ---
+gmv_total = df.gmv.sum()
+nec_total = df.necessidades.sum()
+conv_total = df.convertidas.sum()
+taxa_conv = conv_total / nec_total if nec_total > 0 else 0
+preco_med = df.preco.mean()
+
+# --- LAYOUT KPIs ---
+st.title("📊 Hero Lens — Visão Geral")
+
+col1, col2, col3, col4, col5 = st.columns(5)
+
+col1.metric("GMV", f"R${gmv_total:,.0f}".replace(",", "."))
+col2.metric("Necessidades", f"{nec_total:,.0f}".replace(",", "."))
+col3.metric("Convertidas", f"{conv_total:,.0f}".replace(",", "."))
+col4.metric("Conversão", f"{taxa_conv:.1%}")
+col5.metric("Preço Médio Hospedagem", f"R${preco_med:,.0f}".replace(",", "."))
+
+st.markdown("---")
+
+# --- TABELA ---
+st.subheader("📍 Detalhamento")
+st.dataframe(df, use_container_width=True)
