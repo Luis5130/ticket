@@ -42,7 +42,7 @@ for c in cols_numericas:
 for c in cols_numericas:
     df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
-# --- TAXA DE CONVERSÃO AUTO CALCULADA ---
+# --- TAXA DE CONVERSÃO ---
 df["conversao"] = (df["convertidas"] / df["necessidades"]).fillna(0)
 
 # --- FILTROS ---
@@ -67,11 +67,9 @@ conv_total = df.convertidas.sum()
 taxa_conv = conv_total / nec_total if nec_total > 0 else 0
 preco_med = df.preco.mean()
 
-# --- LAYOUT KPI ---
 st.title("📊 Hero Lens — Visão Geral")
 
 col1, col2, col3, col4, col5 = st.columns(5)
-
 col1.metric("GMV", f"R${gmv_total:,.0f}".replace(",", "."))
 col2.metric("Necessidades", f"{nec_total:,.0f}".replace(",", "."))
 col3.metric("Convertidas", f"{conv_total:,.0f}".replace(",", "."))
@@ -80,6 +78,9 @@ col5.metric("Preço Médio Hospedagem", f"R${preco_med:,.0f}".replace(",", "."))
 
 st.markdown("---")
 
-# --- TABELA ---
+# --- TABELA (EXIBIÇÃO FORMATADA) ---
+df_display = df.copy()
+df_display["conversao"] = (df_display["conversao"] * 100).round(1).astype(str) + "%"
+
 st.subheader("📍 Detalhamento")
-st.dataframe(df, use_container_width=True)
+st.dataframe(df_display, use_container_width=True)
