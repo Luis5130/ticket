@@ -1,74 +1,46 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Dash Melhor Herói", layout="wide")
+st.set_page_config(page_title="Hero Lens", layout="wide")
 
 @st.cache_data
-def load_data(uploaded_file):
-    df = pd.read_excel(uploaded_file)
-    df.rename(columns={
-        "Preço de Hospedagem": "Preco",
-        "Necessidades": "Necessidades",
-        "Convertidas": "Convertidas"
-    }, inplace=True)
+def get_data():
+    sheet_id = "1KZeV67DkWe9JDrKm-ijuCuCh42B0oZ0bAIhKUrQfQ-4"
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    return pd.read_csv(url)
 
-    # Garantir número
-    df["Preco"] = pd.to_numeric(df["Preco"], errors="coerce")
-    df["Necessidades"] = pd.to_numeric(df["Necessidades"], errors="coerce")
-    df["Convertidas"] = pd.to_numeric(df["Convertidas"], errors="coerce")
+df = get_data()
 
-    # Conversão
-    df["Conversao"] = df["Convertidas"] / df["Necessidades"]
-    df["Conversao"].fillna(0, inplace=True)
+# Renomeando colunas
+df = df.rename(columns={
+    "Região": "regiao",
+    "UF": "uf",
+    "Cidade": "cidade",
+    "Bairro": "bairro",
+    "GMV": "gmv",
+    "Necessidades": "necessidades",
+    "Convertidas": "convertidas",
+    "Conversão": "conversao",
+    "Preço de Hospedagem": "preco"
+})
 
-    return df
+# Sidebar - Filtros
+with st.sidebar:
+    st.header("Filtros")
+    regiao = st.selectbox("Região", ["Todos"] + sorted(df.regiao.dropna().unique()))
+    uf = st.selectbox("UF", ["Todos"] + sorted(df.uf.dropna().unique()))
+    cidade = st.selectbox("Cidade", ["Todos"] + sorted(df.cidade.dropna().unique()))
+    bairro = st.selectbox("Bairro", ["Todos"] + sorted(df.bairro.dropna().unique()))
 
-def calcular_status(df):
-    resultados = []
+# Aplicar filtros
+f = df.copy()
+if regiao != "Todos": f = f[f.regiao == regiao]
+if uf != "Todos": f = f[f.uf == uf]
+if cidade != "Todos": f = f[f.cidade == cidade]
+if bairro != "Todos": f = f[f.bairro == bairro]
 
-    for bairro, group in df.groupby("Bairro"):
-        media_preco = group["Preco"].mean()
-        max_preco = group["Preco"].max()
-        min_preco = group["Preco"].min()
+# Guardar dataset filtrado
+st.session_state["df_filtrado"] = f
 
-        # Melhor herói = quem tem mais convertidas, empatou → maior conversão
-        melhor = group.sort_values(["Convertidas", "Conversao"], ascending=[False, False]).iloc[0]
-
-        # Status de Preço desse melhor
-        if melhor["Preco"] == max_preco:
-            status = "Mais Caro do Bairro"
-        elif melhor["Preco"] == min_preco:
-            status = "Mais Barato do Bairro"
-        elif melhor["Preco"] > media_preco * 1.10:
-            status = "Acima da Média"
-        elif melhor["Preco"] < media_preco * 0.90:
-            status = "Abaixo da Média"
-        else:
-            status = "Na Média"
-
-        resultados.append({
-            "Bairro": bairro,
-            "Herói": melhor["Herói"] if "Herói" in melhor else melhor["cod_prestador"],
-            "Cidade": melhor["Cidade"] if "Cidade" in melhor else "",
-            "Necessidades": melhor["Necessidades"],
-            "Convertidas": melhor["Convertidas"],
-            "Conversão (%)": round(melhor["Conversao"] * 100, 1),
-            "Preço": melhor["Preco"],
-            "Status de Preço": status
-        })
-
-    return pd.DataFrame(resultados)
-
-uploaded_file = st.file_uploader("📂 Envie a planilha", type=["xlsx"])
-
-if uploaded_file:
-    df = load_data(uploaded_file)
-    resultado = calcular_status(df)
-
-    st.markdown("## ⭐ Heróis com Melhor Conversão (por Bairro)")
-    st.dataframe(resultado, use_container_width=True)
-
-    # Gráfico Status
-    st.markdown("### 📊 Status de Preço entre os Melhores Convertidos")
-    graf = resultado.groupby("Status de Preço").size().reset_index(name="Qtd")
-    st.bar_chart(graf, x="Status de Preço", y="Qtd")
+st.title("🐶 Hero Lens")
+st.write("Bem-vindo! Navegue pelas páginas no menu lateral.")
