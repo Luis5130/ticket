@@ -26,20 +26,24 @@ df = df.rename(columns={
 
 # --- CONVERSÃO DE TIPOS ---
 cols_numericas = ["gmv", "necessidades", "convertidas", "preco"]
+
 for c in cols_numericas:
     df[c] = (
         df[c]
         .astype(str)
         .str.replace("R$", "", regex=False)
-        .str.replace(".", "", regex=False)  # remove milhar
-        .str.replace(",", ".", regex=False) # troca vírgula por ponto
-        .astype(float)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+        .str.strip()
+        .replace("", "0")
     )
 
-# conversão em percentual
-df["conversao"] = (
-    df["convertidas"] / df["necessidades"]
-).fillna(0)
+# Forçar conversão e substituir valores inválidos
+for c in cols_numericas:
+    df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+# --- TAXA DE CONVERSÃO AUTO CALCULADA ---
+df["conversao"] = (df["convertidas"] / df["necessidades"]).fillna(0)
 
 # --- FILTROS ---
 st.sidebar.header("Filtros")
@@ -63,7 +67,7 @@ conv_total = df.convertidas.sum()
 taxa_conv = conv_total / nec_total if nec_total > 0 else 0
 preco_med = df.preco.mean()
 
-# --- LAYOUT KPIs ---
+# --- LAYOUT KPI ---
 st.title("📊 Hero Lens — Visão Geral")
 
 col1, col2, col3, col4, col5 = st.columns(5)
