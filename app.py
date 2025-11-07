@@ -38,7 +38,7 @@ for c in cols_numericas:
         .replace("", "0")
     )
 
-# Forçar conversão e substituir valores inválidos
+# Forçar conversão para número
 for c in cols_numericas:
     df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
@@ -78,8 +78,10 @@ col5.metric("Preço Médio Hospedagem", f"R${preco_med:,.0f}".replace(",", "."))
 
 st.markdown("---")
 
-# --- TABELA (EXIBIÇÃO FORMATADA) ---
+# --- TABELA FORMATADA ---
 df_display = df.copy()
+df_display["gmv"] = df_display["gmv"].apply(lambda x: f"R${x:,.0f}".replace(",", "."))
+df_display["preco"] = df_display["preco"].apply(lambda x: f"R${x:,.0f}".replace(",", "."))
 df_display["conversao"] = (df_display["conversao"] * 100).round(1).astype(str) + "%"
 
 st.subheader("📍 Detalhamento")
