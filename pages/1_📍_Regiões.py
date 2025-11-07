@@ -1,19 +1,34 @@
 import streamlit as st
+import pandas as pd
+
 st.title("📍 Desempenho por Região")
-df = st.session_state["df_filtrado"]
-regioes = df.groupby("regiao", as_index=False).agg({
-    "gmv": "sum",
-    "necessidades": "sum",
-    "convertidas": "sum"
-})
+
+# Verifica se df filtrado existe
+if "df_filtrado" not in st.session_state:
+    st.error("Volte à página inicial e aplique os filtros primeiro.")
+    st.stop()
+
+df = st.session_state["df_filtrado"].copy()
+
+# Agrupamento por região
+regioes = (
+    df.groupby("regiao")
+    .agg({
+        "gmv": "sum",
+        "necessidades": "sum",
+        "convertidas": "sum",
+        "preco": "mean"
+    })
+    .reset_index()
+)
+
 regioes["conversao"] = regioes["convertidas"] / regioes["necessidades"]
-regioes = regioes.fillna(0)
-cols = st.columns(3)
-for i, row in regioes.iterrows():
-    col = cols[i % 3]
-    with col:
-        st.metric(
-            label=row.regiao,
-            value=f"R${row.gmv:,.0f}",
-            delta=f"{row.conversao:.1%}"
-        )
+regioes["preco"] = regioes["preco"].fillna(0)
+
+# --- EXIBIÇÃO FORMATADA ---
+regioes_display = regioes.copy()
+regioes_display["gmv"] = "R$ " + regioes_display["gmv"].round(0).astype(int).astype(str)
+regioes_display["preco"] = "R$ " + regioes_display["preco"].round(0).astype(int).astype(str)
+regioes_display["conversao"] = (regioes_display["conversao"] * 100).round(1).astype(str) + "%"
+
+st.dataframe(regioes_display, use_container_width=True)
