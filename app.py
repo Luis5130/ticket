@@ -38,9 +38,7 @@ for c in cols_numericas:
         .replace("", "0")
     )
 
-# Forçar conversão para número
-for c in cols_numericas:
-    df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+df[cols_numericas] = df[cols_numericas].apply(pd.to_numeric, errors="coerce").fillna(0)
 
 # --- TAXA DE CONVERSÃO ---
 df["conversao"] = (df["convertidas"] / df["necessidades"]).fillna(0)
@@ -60,6 +58,9 @@ f_bairro = st.sidebar.selectbox("Bairro", ["Todas"] + sorted(df.bairro.dropna().
 if f_bairro != "Todas":
     df = df[df.bairro == f_bairro]
 
+# ✅ Guarda para outras páginas
+st.session_state["df_filtrado"] = df.copy()
+
 # --- KPIs ---
 gmv_total = df.gmv.sum()
 nec_total = df.necessidades.sum()
@@ -78,11 +79,8 @@ col5.metric("Preço Médio Hospedagem", f"R${preco_med:,.0f}".replace(",", "."))
 
 st.markdown("---")
 
-# --- TABELA FORMATADA ---
+# --- TABELA ---
 df_display = df.copy()
-df_display["gmv"] = df_display["gmv"].apply(lambda x: f"R${x:,.0f}".replace(",", "."))
-df_display["preco"] = df_display["preco"].apply(lambda x: f"R${x:,.0f}".replace(",", "."))
 df_display["conversao"] = (df_display["conversao"] * 100).round(1).astype(str) + "%"
-
 st.subheader("📍 Detalhamento")
 st.dataframe(df_display, use_container_width=True)
