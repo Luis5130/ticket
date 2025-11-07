@@ -24,23 +24,11 @@ df = df.rename(columns={
     "Preço de Hospedagem": "preco"
 })
 
-# Sidebar - Filtros
-with st.sidebar:
-    st.header("Filtros")
-    regiao = st.selectbox("Região", ["Todos"] + sorted(df.regiao.dropna().unique()))
-    uf = st.selectbox("UF", ["Todos"] + sorted(df.uf.dropna().unique()))
-    cidade = st.selectbox("Cidade", ["Todos"] + sorted(df.cidade.dropna().unique()))
-    bairro = st.selectbox("Bairro", ["Todos"] + sorted(df.bairro.dropna().unique()))
-
-# Aplicar filtros
-f = df.copy()
-if regiao != "Todos": f = f[f.regiao == regiao]
-if uf != "Todos": f = f[f.uf == uf]
-if cidade != "Todos": f = f[f.cidade == cidade]
-if bairro != "Todos": f = f[f.bairro == bairro]
-
-# Guardar dataset filtrado
-st.session_state["df_filtrado"] = f
-
-st.title("🐶 Hero Lens")
-st.write("Bem-vindo! Navegue pelas páginas no menu lateral.")
+# --- CONVERSÃO DE TIPOS ---
+cols_numericas = ["gmv", "necessidades", "convertidas", "preco"]
+for c in cols_numericas:
+    df[c] = (
+        df[c]
+        .astype(str)
+        .str.replace("R$", "", regex=False)
+        .s
